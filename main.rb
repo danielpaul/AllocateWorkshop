@@ -1,0 +1,154 @@
+LIMIT_PER_WORKSHOP = 30
+
+require 'csv'
+
+# Load the data from CSV
+participants = []
+CSV.foreach('input.csv', headers: true) do |row|
+
+  # input.csv format:
+  # Submission ID,Respondent ID,Submitted at,Your Full Name (Teen's Name),Your Email,Rank/Order Your Choices
+  # PgYbzQ,l0WyWk,2024-08-11 23:25:40,Testing,test@me.com,"Eucharistic Miracles, Science & Religion, Catholic Femininity, Catholic Masculinity, How to Pray, Salvation History"
+
+  participants << {
+    id: row['Respondent ID'],
+    name: row['Your Full Name (Teen\'s Name)'],
+    email: row['Your Email'],
+    preferences: row['Rank/Order Your Choices'].split(', ')
+  }
+end
+
+# Initialize workshop slots for both days
+workshops = {
+  "Eucharistic Miracles" => { "Saturday" => [] },
+  "Science & Religion" => { "Saturday" => [], "Sunday" => [] },
+  "Catholic Femininity" => { "Sunday" => [] },
+  "Catholic Masculinity" => { "Sunday" => [] },
+  "How to Pray" => { "Saturday" => [] },
+  "Salvation History" => { "Saturday" => [], "Sunday" => [] }
+}
+
+# Function to allocate workshops ensuring one on each day
+def allocate_workshops(participants, workshops)
+  participants.each do |participant|
+    saturday_assigned = false
+    sunday_assigned = false
+
+    participant[:preferences].each do |choice|
+      if !saturday_assigned && workshops[choice]["Saturday"] && workshops[choice]["Saturday"].length < LIMIT_PER_WORKSHOP
+        workshops[choice]["Saturday"] << participant
+        saturday_assigned = true
+      elsif !sunday_assigned && workshops[choice]["Sunday"] && workshops[choice]["Sunday"].length < LIMIT_PER_WORKSHOP
+        workshops[choice]["Sunday"] << participant
+        sunday_assigned = true
+      end
+
+      # Break if both days are assigned
+      break if saturday_assigned && sunday_assigned
+    end
+
+    # If unable to assign one or both days, handle fallback logic here
+    unless saturday_assigned
+      # Assign to any available Saturday workshop
+      workshops.each do |workshop, days|
+        if days["Saturday"] && days["Saturday"].length < LIMIT_PER_WORKSHOP
+          days["Saturday"] << participant
+          break
+        end
+      end
+    end
+
+    unless sunday_assigned
+      # Assign to any available Sunday workshop
+      workshops.each do |workshop, days|
+        if days["Sunday"] && days["Sunday"].length < LIMIT_PER_WORKSHOP
+          days["Sunday"] << participant
+          break
+        end
+      end
+    end
+  end
+end
+
+# Call the allocation function
+allocate_workshops(participants, workshops)
+
+# Output the allocation results to the console (or save to a file)
+workshops.each do |workshop, days|
+  puts "\n\n"
+  puts "Workshop: #{workshop}"
+  days.each do |day, attendees|
+    puts "\n"
+    puts "  #{day}: #{attendees.length}"
+    attendees.each do |attendee|
+      puts "    #{attendee[:name]} (#{attendee[:email]})"
+    end
+  end
+end
+
+puts "\n\n\n"
+puts "---------------------------------"
+puts "\n\n\n"
+
+# Output the allocation based on each participant
+participants.each do |participant|
+  puts "\n"
+  puts "#{participant[:name]} (#{participant[:email]})"
+  participant[:preferences].each do |choice|
+    if workshops[choice]["Saturday"] && workshops[choice]["Saturday"].include?(participant)
+      puts "  Saturday: #{choice}"
+    end
+
+    if workshops[choice]["Sunday"] && workshops[choice]["Sunday"].include?(participant)
+      puts "  Sunday: #{choice}"
+    end
+  end
+end
+
+
+puts "\n\n\n"
+puts "---------------------------------"
+puts "\n\n\n"
+
+
+# Write the output to a CSV files
+Dir.mkdir('output') unless Dir.exist?('output')
+
+# Write attendance lists for each workshop
+workshops.each do |workshop, days|
+  days.each do |day, attendees|
+    filename = "output/#{workshop.gsub(' ', '_')}_#{day}_attendance.csv"
+    CSV.open(filename, 'wb') do |csv|
+      csv << ["#{workshop} (#{day})", "Participant Name", "Email"]
+      attendees.each do |participant|
+        csv << [nil, participant[:name], participant[:email]]
+      end
+    end
+
+    puts "Attendance lists for #{workshop} (#{day}) created."
+  end
+end
+
+# Write the participant allocation to a CSV file
+CSV.open('output/participants.csv', 'wb') do |csv|
+  csv << ['Participant Name', 'Email', 'Saturday Workshop', 'Sunday Workshop']
+
+  participants.each do |participant|
+    saturday_workshop = ""
+    sunday_workshop = ""
+
+    participant[:preferences].each do |choice|
+      if workshops[choice]["Saturday"] && workshops[choice]["Saturday"].include?(participant)
+        saturday_workshop = choice
+      end
+
+      if workshops[choice]["Sunday"] && workshops[choice]["Sunday"].include?(participant)
+        sunday_workshop = choice
+      end
+    end
+
+    csv << [participant[:name], participant[:email], saturday_workshop, sunday_workshop]
+  end
+
+  puts "Participant allocation list created."
+end
