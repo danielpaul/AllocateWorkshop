@@ -9,10 +9,12 @@ Submission ID,Respondent ID,Submitted at,Your Full Name (Teen's Name),Your Email
 PgYbzQ,l0WyWk,2024-08-11 23:25:40,Testing,test@me.com,"Eucharistic Miracles, Science & Religion, Catholic Femininity, Catholic Masculinity, How to Pray, Salvation History"
 ```
 
-2. Run the following command:
+2. Edit the script to add the correct workshops, days and `LIMIT_PER_WORKSHOP` variable.
+
+3. Run the following command:
 
 ```bash
 ruby main.py
 ```
 
-3. The output will be in printed in the console and saved in `output` folder.
+4. The output will be in printed in the console and saved in `output` folder.

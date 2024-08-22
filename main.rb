@@ -1,31 +1,40 @@
-LIMIT_PER_WORKSHOP = 30
+LIMIT_PER_WORKSHOP = 35
 
 require 'csv'
 
 # Load the data from CSV
 participants = []
+names_seen = {}
+
 CSV.foreach('input.csv', headers: true) do |row|
 
   # input.csv format:
   # Submission ID,Respondent ID,Submitted at,Your Full Name (Teen's Name),Your Email,Rank/Order Your Choices
   # PgYbzQ,l0WyWk,2024-08-11 23:25:40,Testing,test@me.com,"Eucharistic Miracles, Science & Religion, Catholic Femininity, Catholic Masculinity, How to Pray, Salvation History"
 
-  participants << {
-    id: row['Respondent ID'],
-    name: row['Your Full Name (Teen\'s Name)'],
-    email: row['Your Email'],
-    preferences: row['Rank/Order Your Choices'].split(', ')
-  }
+  unless names_seen[name]
+    participants << {
+      id: row['Respondent ID'],
+      name: row['Your Full Name (Teen\'s Name)'],
+      email: row['Your Email'],
+      preferences: row['Rank/Order Your Choices'].split(', ')
+    }
+
+    names_seen[name] = true
+  end
 end
 
 # Initialize workshop slots for both days
+# Order here is important to assign participants to the first available 
+# workshop when their preferences are full. Order this based on the least popular first
+# to fill those up first.
 workshops = {
-  "Eucharistic Miracles" => { "Saturday" => [] },
-  "Science & Religion" => { "Saturday" => [], "Sunday" => [] },
   "Catholic Femininity" => { "Sunday" => [] },
   "Catholic Masculinity" => { "Sunday" => [] },
+  "Eucharistic Miracles" => { "Saturday" => [] },
   "How to Pray" => { "Saturday" => [] },
-  "Salvation History" => { "Saturday" => [], "Sunday" => [] }
+  "Salvation History" => { "Saturday" => [], "Sunday" => [] },
+  "Science & Religion" => { "Saturday" => [], "Sunday" => [] },
 }
 
 # Function to allocate workshops ensuring one on each day
