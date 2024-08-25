@@ -1,4 +1,4 @@
-LIMIT_PER_WORKSHOP = 35
+LIMIT_PER_WORKSHOP = 40
 
 require 'csv'
 
@@ -8,21 +8,34 @@ names_seen = {}
 
 CSV.foreach('input.csv', headers: true) do |row|
 
+  name = row['Your Full Name (Teen\'s Name)'].strip.capitalize
+  email = row['Your Email']
+  gender = row['Gender']
+
   # input.csv format:
   # Submission ID,Respondent ID,Submitted at,Your Full Name (Teen's Name),Your Email,Rank/Order Your Choices
   # PgYbzQ,l0WyWk,2024-08-11 23:25:40,Testing,test@me.com,"Eucharistic Miracles, Science & Religion, Catholic Femininity, Catholic Masculinity, How to Pray, Salvation History"
 
+  # Order by latest submission date first to make their last preferences count vs their first
+
   unless names_seen[name]
     participants << {
-      id: row['Respondent ID'],
-      name: row['Your Full Name (Teen\'s Name)'],
-      email: row['Your Email'],
-      preferences: row['Rank/Order Your Choices'].split(', ')
+      id: row['Respondent ID'] || '123',
+      name: name,
+
+      # random email if we don't have one
+      email: email || "#{name.downcase.gsub(' ', '_')}@example.com",
+      
+      # if no preferences, assign them to a random workshop based on least popular
+      preferences: row['Rank/Order Your Choices']&.split(', ') || ["Science & Religion", "Salvation History"],
+
+      gender: gender
     }
 
     names_seen[name] = true
   end
 end
+
 
 # Initialize workshop slots for both days
 # Order here is important to assign participants to the first available 
@@ -43,6 +56,17 @@ def allocate_workshops(participants, workshops)
     saturday_assigned = false
     sunday_assigned = false
 
+    # if they are a male, remove Catholic Femininity from their preferences
+    if participant[:gender] == 'M'
+      participant[:preferences].delete('Catholic Femininity')
+    end
+
+    # if they are a female, remove Catholic Masculinity from their preferences
+    if participant[:gender] == 'F'
+      participant[:preferences].delete('Catholic Masculinity')
+    end
+
+    # loop through each of the participant's preferences list
     participant[:preferences].each do |choice|
       if !saturday_assigned && workshops[choice]["Saturday"] && workshops[choice]["Saturday"].length < LIMIT_PER_WORKSHOP
         workshops[choice]["Saturday"] << participant
@@ -60,8 +84,12 @@ def allocate_workshops(participants, workshops)
     unless saturday_assigned
       # Assign to any available Saturday workshop
       workshops.each do |workshop, days|
+        next if participant[:gender] == 'M' && workshop == 'Catholic Femininity'
+        next if participant[:gender] == 'F' && workshop == 'Catholic Masculinity'
+
         if days["Saturday"] && days["Saturday"].length < LIMIT_PER_WORKSHOP
           days["Saturday"] << participant
+          saturday_assigned = true
           break
         end
       end
@@ -70,8 +98,13 @@ def allocate_workshops(participants, workshops)
     unless sunday_assigned
       # Assign to any available Sunday workshop
       workshops.each do |workshop, days|
-        if days["Sunday"] && days["Sunday"].length < LIMIT_PER_WORKSHOP
+        next if participant[:gender] == 'M' && workshop == 'Catholic Femininity'
+        next if participant[:gender] == 'F' && workshop == 'Catholic Masculinity'
+
+        # skip if they have been allocated to the same workshop on Saturday
+        if (days["Sunday"] && days["Sunday"].length < LIMIT_PER_WORKSHOP) && (days["Saturday"] && !days["Saturday"].include?(participant))
           days["Sunday"] << participant
+          sunday_assigned = true
           break
         end
       end
